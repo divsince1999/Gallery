@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Photographer {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  passwordHash  String
+  name          String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  
+  brandKit      BrandKit?
+  events        Event[]
+}
+
+model BrandKit {
+  id             String       @id @default(uuid())
+  photographerId String       @unique
+  studioName     String
+  logoUrl        String?
+  primaryColor   String       @default("#000000")
+  accentColor    String?
+  
+  photographer   Photographer @relation(fields: [photographerId], references: [id])
+}
+
+model Event {
+  id            String       @id @default(uuid()) // Internal UUID
+  publicId      String       @unique // Cryptographically random for public URLs
+  photographerId String
+  name          String
+  clientName    String
+  date          DateTime
+  status        String       @default("DRAFT") // DRAFT, PUBLISHED
+  expiryDate    DateTime?
+  
+  // Storage Accounting
+  photoCount    Int          @default(0)
+  storageBytes  BigInt       @default(0)
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  photographer  Photographer @relation(fields: [photographerId], references: [id])
+  photos        Photo[]
+
+  @@index([photographerId])
+}
+
+model Photo {
+  id                String   @id @default(uuid()) // Internal UUID
+  eventId           String
+  originalKey       String?  // R2 key based on UUIDs
+  webKey            String?  
+  thumbKey          String?  
+  status            String   @default("PENDING") // PENDING, UPLOADING, UPLOADED, PROCESSING, READY, FAILED
+  processingError   String?  // Error context for FAILED state
+  fileName          String   
+  fileSize          BigInt   
+  mimeType          String
+  width             Int?
+  height            Int?
+  
+  // Storage Accounting (Granular)
+  originalSizeBytes BigInt?
+  webSizeBytes      BigInt?
+  thumbSizeBytes    BigInt?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  event             Event    @relation(fields: [eventId], references: [id])
+
+  @@index([eventId])
+}
