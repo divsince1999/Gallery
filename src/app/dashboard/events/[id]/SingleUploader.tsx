@@ -25,11 +25,21 @@ export default function SingleUploader({ eventId }: { eventId: string }) {
       setStatus("getting_url");
       setErrorMessage("");
 
-      const { url, photoId } = await generateUploadUrl(eventId, {
+      const res = await generateUploadUrl(eventId, {
         name: file.name,
         size: file.size,
         type: file.type,
       });
+
+      if (res.duplicate) {
+        throw new Error("Duplicate file already exists.");
+      }
+
+      if (!res.url || !res.photoId) {
+        throw new Error("Invalid response from server");
+      }
+
+      const { url, photoId } = res;
 
       setStatus("uploading");
 
@@ -70,7 +80,7 @@ export default function SingleUploader({ eventId }: { eventId: string }) {
           </label>
           <input
             type="file"
-            accept="image/jpeg, image/png, image/webp, image/heic"
+            accept="image/jpeg, image/png, image/webp"
             onChange={handleFileChange}
             disabled={status !== "idle" && status !== "error" && status !== "success"}
             className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"

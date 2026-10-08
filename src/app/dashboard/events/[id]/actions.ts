@@ -8,11 +8,12 @@ import { PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export async function generateUploadUrl(
   eventId: string,
-  fileMetadata: { name: string; size: number; type: string }
+  fileMetadata: { name: string; size: number; type: string },
+  retryPhotoId?: string
 ) {
   // 1. Authenticate the session
   const session = await getServerSession(authOptions);
@@ -48,27 +49,66 @@ export async function generateUploadUrl(
     throw new Error("Unauthorized to upload to this event");
   }
 
-  // 4. Create Photo record with PENDING status
-  const photo = await prisma.photo.create({
-    data: {
-      eventId: event.id,
-      fileName: fileMetadata.name,
-      fileSize: fileMetadata.size,
-      mimeType: fileMetadata.type,
-      status: "PENDING",
-    },
-  });
+  // 4 & 5. Race-safe find/create with Advisory Lock
+  let photo;
 
-  // 5. Generate R2 key structure
+  if (retryPhotoId) {
+    photo = await prisma.photo.findUnique({ where: { id: retryPhotoId } });
+    if (!photo || photo.eventId !== event.id) {
+      throw new Error("Invalid photo record for retry");
+    }
+  } else {
+    // Generate a unique lock key based on event + file signature
+    const lockKey = `upload:${event.id}:${fileMetadata.name}:${fileMetadata.size}`;
+
+    // Array-based batch transaction: no 5-second JS-DB timeout roundtrip.
+    const [, , existingRecords] = await prisma.$transaction([
+      prisma.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`,
+      prisma.$executeRaw`
+        INSERT INTO "Photo" ("id", "eventId", "fileName", "fileSize", "mimeType", "status", "createdAt", "updatedAt")
+        SELECT gen_random_uuid(), ${event.id}, ${fileMetadata.name}, ${fileMetadata.size}, ${fileMetadata.type}, 'PENDING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        WHERE NOT EXISTS (
+          SELECT 1 FROM "Photo" 
+          WHERE "eventId" = ${event.id}
+            AND "fileName" = ${fileMetadata.name}
+            AND "fileSize" = ${fileMetadata.size}
+            AND "status" IN ('PENDING', 'UPLOADED', 'PROCESSING', 'READY', 'FAILED')
+        )
+      `,
+      prisma.photo.findMany({
+        where: {
+          eventId: event.id,
+          fileName: fileMetadata.name,
+          fileSize: fileMetadata.size,
+          status: { in: ["PENDING", "UPLOADED", "PROCESSING", "READY", "FAILED"] },
+        },
+      }),
+    ]);
+
+    // Explicitly prioritize progressed statuses over PENDING
+    const progressed = existingRecords.find((r) => r.status !== "PENDING");
+    if (progressed) {
+      return { duplicate: true };
+    }
+
+    const pending = existingRecords.find((r) => r.status === "PENDING");
+    if (!pending) {
+      throw new Error("Failed to create or retrieve photo record");
+    }
+    
+    photo = pending;
+  }
+
+  // 6. Generate R2 key structure
   const objectKey = `events/${event.id}/originals/${photo.id}`;
 
-  // 6. Update Photo record with the key
+  // 7. Update Photo record with the key
   await prisma.photo.update({
     where: { id: photo.id },
     data: { originalKey: objectKey },
   });
 
-  // 7. Generate presigned PUT URL
+  // 8. Generate presigned PUT URL
   const command = new PutObjectCommand({
     Bucket: R2_BUCKET_NAME,
     Key: objectKey,
@@ -82,6 +122,7 @@ export async function generateUploadUrl(
   return {
     url,
     photoId: photo.id,
+    duplicate: false,
   };
 }
 
@@ -122,11 +163,16 @@ export async function verifyUpload(photoId: string) {
     throw new Error("File not found in R2 or upload incomplete");
   }
 
-  // 4. Mark as UPLOADED
-  await prisma.photo.update({
-    where: { id: photoId },
+  // 4. Mark as UPLOADED if it was PENDING
+  const result = await prisma.photo.updateMany({
+    where: { id: photoId, status: "PENDING" },
     data: { status: "UPLOADED" },
   });
+
+  if (result.count === 0) {
+    // If count is 0, the photo was already UPLOADED or further along, or didn't exist.
+    // It's safe to return success since it's not PENDING anymore.
+  }
 
   return { success: true };
 }

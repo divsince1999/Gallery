@@ -4,7 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Calendar, User as UserIcon } from "lucide-react";
-import SingleUploader from "./SingleUploader";
+import BulkUploader from "./BulkUploader";
+import ProcessingDriver from "./ProcessingDriver";
+import GalleryGrid from "./GalleryGrid";
 
 export default async function EventDetailsPage({
   params,
@@ -21,6 +23,20 @@ export default async function EventDetailsPage({
 
   const event = await prisma.event.findUnique({
     where: { id },
+    include: {
+      photos: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          status: true,
+          thumbKey: true,
+          webKey: true,
+          width: true,
+          height: true,
+          fileName: true,
+        },
+      },
+    },
   });
 
   // Authorization check: Does the event exist and belong to the current user?
@@ -72,21 +88,23 @@ export default async function EventDetailsPage({
         </div>
       </div>
       
-      {/* 
-        This is a minimal implementation for Phase 2 Step 2.
-        Future phases will add the bulk photo uploader and gallery link here. 
-      */}
       <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
         <div className="flex">
           <div className="ml-3">
             <p className="text-sm text-blue-700">
-              R2 Upload Foundation is active. Use the form below to test a single direct-to-R2 upload.
+              Bulk Photo Uploader is active.
             </p>
           </div>
         </div>
       </div>
 
-      <SingleUploader eventId={event.id} />
+      <ProcessingDriver eventId={event.id} />
+      <BulkUploader eventId={event.id} />
+
+      <div className="pt-8 border-t border-gray-200">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Photographer Gallery</h2>
+        <GalleryGrid photos={event.photos} />
+      </div>
     </div>
   );
 }

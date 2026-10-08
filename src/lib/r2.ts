@@ -23,3 +23,8 @@ export const r2Client = new S3Client({
 });
 
 export const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
+
+if (!process.env.R2_PUBLIC_BUCKET_NAME) {
+  throw new Error("R2_PUBLIC_BUCKET_NAME is missing");
+}
+export const R2_PUBLIC_BUCKET_NAME = process.env.R2_PUBLIC_BUCKET_NAME;
