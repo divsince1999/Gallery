@@ -116,6 +116,9 @@ export default function BulkUploader({ eventId }: { eventId: string }) {
       
       // 4. Final Success
       updateFile(qf.id, { status: "UPLOADED", bytesUploaded: qf.file.size, progress: 100 });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("photo-uploaded", { detail: { eventId } }));
+      }
       
     } catch (error) {
       console.error(`Upload error for ${qf.file.name}:`, error);

@@ -1,6 +1,6 @@
 # Gallery — Current State
 
-_Last updated: 2026-10-12_
+_Last updated: 2026-10-14_
 
 ## Product
 White-label, ad-free photo gallery platform for Indian photographers.
@@ -58,7 +58,7 @@ V1
 - `src/lib/processing.ts` (sharp): EXIF rotate, web 2048px q82 WebP, thumb 480px q75 WebP.
 - Optimistic-lock claim, max 3 attempts, then stays `FAILED`.
 - On READY: sets sizes/dimensions, clears `processingError`, increments `Event.photoCount` and `Event.storageBytes` (original + web + thumb).
-- Page-driven for V1: `ProcessingDriver.tsx` polls `/api/events/[id]/processing-status` every 3s and calls `/api/photos/[id]/process` (max 2 concurrent). No cron/worker.
+- Page-driven for V1: `ProcessingDriver.tsx` coordinates processing (`/api/photos/[id]/process`, max 2 concurrent), halts polling when idle, and wakes up via `photo-uploaded` events from `BulkUploader` or tab visibility changes. Single polling chain and unmount cancellation enforced. No cron/worker.
 
 ### Gallery rendering (photographer, read-only)
 - `GalleryGrid.tsx`: READY photos only; `thumbKey` for tiles, `webKey` in the viewer; never `originalKey`; responsive grid (2 cols on mobile, up to 6 on desktop); empty state ("No ready photos"); queue status counts for pending/uploaded/processing/failed.
