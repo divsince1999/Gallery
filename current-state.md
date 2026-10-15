@@ -1,6 +1,6 @@
 # Gallery — Current State
 
-_Last updated: 2026-10-14_
+_Last updated: 2026-10-15_
 
 ## Product
 White-label, ad-free photo gallery platform for Indian photographers.
@@ -11,8 +11,9 @@ V1
 ## Development Status
 - Phase 1 — VERIFIED
 - Phase 2 (Event Management + R2 + upload + processing) — STABILIZED & VERIFIED
-- Photographer Gallery (read-only) — STABILIZED & VERIFIED (Lightbox with Next/Prev navigation, keyboard controls, responsive grid, R2 public CDN delivery)
-- Overall V1 Status: IN PROGRESS — Not yet production-ready (Public/client gallery, individual downloads, expiry enforcement, and sharing remain to be implemented per implementation_plan.md)
+- Photographer Gallery (read-only) — STABILIZED & VERIFIED
+- Public Client Gallery (unauthenticated viewer + publish toggle + branding + expiry enforcement) — IMPLEMENTED & VERIFIED
+- Overall V1 Status: IN PROGRESS (Individual downloads and sharing options remain per implementation_plan.md)
 
 ## Phase 1 Completed
 - Next.js + TypeScript + Tailwind
@@ -69,13 +70,36 @@ V1
   - Image counter indicator (`X / Y`)
   - Pointer-events-none overlay to avoid obscuring tiles
 
-## Verification Results (2026-10-12)
+### Public Client Gallery (unauthenticated client viewer)
+- Public route: `src/app/gallery/[publicId]/page.tsx`
+  - Validates 32-hex `publicId` format; invalid formats return 404 immediately.
+  - Enforces `Event.status === "PUBLISHED"`; draft events return 404 (preventing discovery/enumeration).
+  - Enforces `Event.expiryDate`; expired events return 404.
+  - Photo query filters strictly for `READY` status (`where: { status: "READY" }`).
+  - Private original isolation: `originalKey` is never queried or transmitted; tiles use `thumbKey` (480px WebP) and lightbox viewer uses `webKey` (2048px WebP) from the public CDN.
+- Photographer publish workflow:
+  - `togglePublishEvent` server action in `src/app/dashboard/events/[id]/actions.ts`: enforces active NextAuth session and event ownership verification before updating `Event.status` to `PUBLISHED` or `DRAFT`.
+  - `PublishToggle.tsx` component in `src/app/dashboard/events/[id]/page.tsx`: provides one-click publishing/unpublishing, live shareable client URL display, and instant link copying.
+- Client gallery component: `src/app/gallery/[publicId]/ClientGallery.tsx`
+  - Studio branding: studio name, logo, and brand primary color accent.
+  - Responsive thumbnail grid with lazy loading.
+  - Fullscreen lightbox viewer with Next/Previous navigation, keyboard controls (`ArrowLeft`, `ArrowRight`, `Escape`), and image counter indicator.
+  - Empty state when no ready photos exist.
+  - Completely excludes all photographer admin controls, uploaders, and queue statuses.
+
+## Verification Results (2026-10-15)
 - TypeScript: `npx tsc --noEmit` passed with 0 errors.
 - ESLint: `npm run lint` passed with 0 errors / 0 warnings.
-- Production Build: `npm run build` compiled cleanly in 11.0s (Next.js 16.3.5 Turbopack).
-- Browser E2E Test: Full verification recorded (`e2e_gallery_verification_1791816060100.webp`).
-- Ownership Checks: Verified 404 returned when accessing another user's event.
-- Storage Isolation: Verified public domain returns 200 for web/thumb derivatives and 404 for originals.
+- Production Build: `npm run build` compiled cleanly in 14.3s with dynamic server route `/gallery/[publicId]`.
+- Automated Security & Functional Suite:
+  - Invalid publicId format -> 404.
+  - Non-existent publicId -> 404.
+  - Unpublished (DRAFT) event -> 404.
+  - Published event with unauthenticated client -> 200, verified studio branding, event title, client name, and photo grid.
+  - Original key leakage check -> Passed (no originalKey or private bucket references in HTML).
+  - Expired event access -> 404.
+  - Immediate unpublishing revocation -> 404.
+- Browser E2E Test: Full verification recorded (`public_gallery_test`). Verified studio brand header, event metadata, photo grid, lightbox opening with web-size image, navigation, and modal dismissal.
 
 ## Known Limitations
 - Manually resetting READY → UPLOADED via external script and reprocessing double-counts `photoCount`/`storageBytes`. (Normal application code never does this).
@@ -85,6 +109,8 @@ V1
 - Duplicates are detected by file name + size.
 - No pagination/virtualization; plain `<img>` tiles.
 - `NEXT_PUBLIC_R2_PUBLIC_URL` is a `pub-*.r2.dev` dev domain rather than a custom domain.
+- Individual original photo downloads not yet implemented (scheduled for downloads milestone).
+- No client selections, favorites, comments, or bulk downloads (strictly excluded from V1).
 
 ## Architectural Rules
 - `Event.id` = internal UUID

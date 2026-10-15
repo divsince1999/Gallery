@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { r2Client, R2_BUCKET_NAME } from "@/lib/r2";
 import { PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { revalidatePath } from "next/cache";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -175,4 +176,41 @@ export async function verifyUpload(photoId: string) {
   }
 
   return { success: true };
+}
+
+export async function togglePublishEvent(
+  eventId: string,
+  newStatus: "DRAFT" | "PUBLISHED"
+) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error("Unauthenticated");
+  }
+
+  if (newStatus !== "DRAFT" && newStatus !== "PUBLISHED") {
+    throw new Error("Invalid status");
+  }
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { photographerId: true, publicId: true },
+  });
+
+  if (!event) {
+    throw new Error("Event not found");
+  }
+
+  if (event.photographerId !== session.user.id) {
+    throw new Error("Unauthorized");
+  }
+
+  const updatedEvent = await prisma.event.update({
+    where: { id: eventId },
+    data: { status: newStatus },
+  });
+
+  revalidatePath(`/dashboard/events/${eventId}`);
+  revalidatePath(`/gallery/${event.publicId}`);
+
+  return { success: true, status: updatedEvent.status };
 }

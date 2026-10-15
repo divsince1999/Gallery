@@ -7,6 +7,7 @@ import { ArrowLeft, Calendar, User as UserIcon } from "lucide-react";
 import BulkUploader from "./BulkUploader";
 import ProcessingDriver from "./ProcessingDriver";
 import GalleryGrid from "./GalleryGrid";
+import PublishToggle from "./PublishToggle";
 
 export default async function EventDetailsPage({
   params,
@@ -53,10 +54,13 @@ export default async function EventDetailsPage({
           </Link>
           <h1 className="text-3xl font-bold text-gray-900">{event.name}</h1>
         </div>
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-          Status: {event.status}
-        </span>
       </div>
+
+      <PublishToggle
+        eventId={event.id}
+        initialStatus={event.status as "DRAFT" | "PUBLISHED"}
+        publicId={event.publicId}
+      />
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="px-6 py-5 border-b border-gray-200">
