@@ -72,7 +72,7 @@ V1
 
 ### Public Client Gallery (unauthenticated client viewer)
 - Public route: `src/app/gallery/[publicId]/page.tsx`
-  - Validates 32-hex `publicId` format; invalid formats return 404 immediately.
+  - Validates `publicId` format via `/^[a-zA-Z0-9_-]{8,64}$/` (accommodating 16-character, 32-character, and alphanumeric public identifiers while rejecting arbitrary/malformed inputs); invalid formats return 404 immediately.
   - Enforces `Event.status === "PUBLISHED"`; draft events return 404 (preventing discovery/enumeration).
   - Enforces `Event.expiryDate`; expired events return 404.
   - Photo query filters strictly for `READY` status (`where: { status: "READY" }`).
@@ -92,14 +92,15 @@ V1
 - ESLint: `npm run lint` passed with 0 errors / 0 warnings.
 - Production Build: `npm run build` compiled cleanly in 14.3s with dynamic server route `/gallery/[publicId]`.
 - Automated Security & Functional Suite:
-  - Invalid publicId format -> 404.
+  - Invalid publicId format (e.g. punctuation, short length) -> 404.
   - Non-existent publicId -> 404.
   - Unpublished (DRAFT) event -> 404.
-  - Published event with unauthenticated client -> 200, verified studio branding, event title, client name, and photo grid.
-  - Original key leakage check -> Passed (no originalKey or private bucket references in HTML).
+  - Published 16-character publicId (`d1b5374d9beea244`) -> 200 OK.
+  - Published 32-character publicId (`f02a9276c92c5e472e5ef498f693c342`) -> 200 OK.
+  - Original key leakage check -> Passed (0 occurrences of `gallery-storage-dev` or `/originals/` in HTML).
   - Expired event access -> 404.
   - Immediate unpublishing revocation -> 404.
-- Browser E2E Test: Full verification recorded (`public_gallery_test`). Verified studio brand header, event metadata, photo grid, lightbox opening with web-size image, navigation, and modal dismissal.
+- Browser E2E Test: Full verification recorded (`verify_reported_url` and `public_gallery_test`). Verified studio brand header, event metadata, photo grid, lightbox opening with web-size image, navigation, and modal dismissal.
 
 ## Known Limitations
 - Manually resetting READY → UPLOADED via external script and reprocessing double-counts `photoCount`/`storageBytes`. (Normal application code never does this).

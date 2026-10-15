@@ -5,6 +5,8 @@ import ClientGallery from "./ClientGallery";
 
 export const dynamic = "force-dynamic";
 
+const PUBLIC_ID_REGEX = /^[a-zA-Z0-9_-]{8,64}$/;
+
 export async function generateMetadata({
   params,
 }: {
@@ -12,7 +14,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { publicId } = await params;
 
-  if (!publicId || typeof publicId !== "string") {
+  if (!publicId || typeof publicId !== "string" || !PUBLIC_ID_REGEX.test(publicId)) {
     return { title: "Gallery Not Found" };
   }
 
@@ -56,8 +58,8 @@ export default async function PublicGalleryPage({
 }) {
   const { publicId } = await params;
 
-  // Validate publicId format to reject arbitrary strings immediately
-  if (!publicId || typeof publicId !== "string" || !/^[a-f0-9]{32}$/i.test(publicId)) {
+  // Validate publicId format to reject arbitrary or malformed strings immediately
+  if (!publicId || typeof publicId !== "string" || !PUBLIC_ID_REGEX.test(publicId)) {
     notFound();
   }
 
