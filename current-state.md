@@ -14,7 +14,8 @@ V1
 - Photographer Gallery (read-only) — STABILIZED & VERIFIED
 - Public Client Gallery (unauthenticated viewer + publish toggle + branding + expiry enforcement) — IMPLEMENTED & VERIFIED
 - Optional Gallery Expiry (creation form input + server validation + database persistence) — IMPLEMENTED & VERIFIED
-- Overall V1 Status: IN PROGRESS (Individual downloads and sharing options remain per implementation_plan.md)
+- Individual Original Downloads (short-lived presigned GET URLs from private bucket + access control + download UI) — IMPLEMENTED & VERIFIED
+- Overall V1 Status: IN PROGRESS (Sharing options like QR / WhatsApp remain per implementation_plan.md)
 
 ## Phase 1 Completed
 - Next.js + TypeScript + Tailwind
@@ -83,20 +84,43 @@ V1
   - `PublishToggle.tsx` component in `src/app/dashboard/events/[id]/page.tsx`: provides one-click publishing/unpublishing, live shareable client URL display, and instant link copying.
 - Client gallery component: `src/app/gallery/[publicId]/ClientGallery.tsx`
   - Studio branding: studio name, logo, and brand primary color accent.
-  - Responsive thumbnail grid with lazy loading.
-  - Fullscreen lightbox viewer with Next/Previous navigation, keyboard controls (`ArrowLeft`, `ArrowRight`, `Escape`), and image counter indicator.
+  - Responsive thumbnail grid with lazy loading and hover download actions.
+  - Fullscreen lightbox viewer with Next/Previous navigation, keyboard controls (`ArrowLeft`, `ArrowRight`, `Escape`), image counter indicator, and "Download Original" action.
   - Empty state when no ready photos exist.
   - Completely excludes all photographer admin controls, uploaders, and queue statuses.
+
+### Individual Original-Photo Downloads
+- Route Handler: `src/app/api/gallery/[publicId]/photos/[photoId]/download/route.ts`
+- Core security logic: `src/lib/downloads.ts` (`generatePhotoDownloadUrl`)
+- Strict server-side checks:
+  1. Validates `publicId` format via `/^[a-zA-Z0-9_-]{8,64}$/`.
+  2. Confirms event exists and is `PUBLISHED` (draft events return 404).
+  3. Confirms event is not expired (expired events return 404).
+  4. Confirms photo exists and strictly belongs to that event (cross-event tampering returns 404).
+  5. Confirms photo status is `READY` (non-ready, pending, or failed photos return 404).
+  6. Confirms `originalKey` presence in private `gallery-storage-dev` bucket.
+- Signs a 5-minute (`expiresIn: 300`) presigned GET URL with `ResponseContentDisposition: attachment; filename="${encodeURIComponent(photo.fileName)}"`.
+- Returns a `302 Found` redirect with `Cache-Control: no-store, max-age=0`.
+- Client Gallery UI: Download button integrated into both grid tiles (hover) and fullscreen lightbox viewer controls (`#client-lightbox-download`).
 
 ## Verification Results (2026-10-17)
 - TypeScript: `npx tsc --noEmit` passed with 0 errors.
 - ESLint: `npm run lint` passed with 0 errors / 0 warnings.
-- Production Build: `npm run build` compiled cleanly in 7.1s (Next.js 16.3.5 Turbopack).
+- Production Build: `npm run build` compiled cleanly in 2.3s (Next.js 16.3.5 Turbopack); compiled dynamic route `ƒ /api/gallery/[publicId]/photos/[photoId]/download`.
+- Automated Individual Download Suite:
+  - Valid photo download: `302 Found` redirect to presigned GET URL -> fetched binary stream from R2 (HTTP `200 OK`, verified complete original byte payload and `attachment; filename` header).
+  - Cross-event photo access tampering: `404 Not Found`.
+  - Draft event photo download: `404 Not Found`.
+  - Expired event photo download: `404 Not Found`.
+  - Non-READY photo download: `404 Not Found`.
+  - Invalid public ID / photo ID: `404 Not Found`.
+  - Direct public CDN access to originalKey: `404 Not Found` (storage isolation maintained).
 - Automated Expiry Tests:
   - Event creation with blank expiry -> stored as `null`, published gallery returns `200 OK`.
   - Event creation with future expiry -> stored as future timestamp (`2026-12-31T00:00:00.000Z`), published gallery returns `200 OK`.
   - Event creation with past expiry -> stored as past timestamp (`2026-10-10T00:00:00.000Z`), published gallery returns `404 Not Found`.
   - Server validation: blank/whitespace/null parses to `null`, valid date strings parse to Date, invalid date strings correctly throw `Invalid expiry date`.
+- Browser E2E Test: Full verification recorded (`verify_client_download`). Verified lightbox download button rendering with valid download URL pointing to `/api/gallery/.../download`.
 
 ## Verification Results (2026-10-15)
 - TypeScript: `npx tsc --noEmit` passed with 0 errors.
@@ -121,7 +145,6 @@ V1
 - Duplicates are detected by file name + size.
 - No pagination/virtualization; plain `<img>` tiles.
 - `NEXT_PUBLIC_R2_PUBLIC_URL` is a `pub-*.r2.dev` dev domain rather than a custom domain.
-- Individual original photo downloads not yet implemented (scheduled for downloads milestone).
 - No client selections, favorites, comments, or bulk downloads (strictly excluded from V1).
 
 ## Architectural Rules

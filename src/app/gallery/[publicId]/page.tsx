@@ -118,6 +118,7 @@ export default async function PublicGalleryPage({
 
   return (
     <ClientGallery
+      publicId={publicId}
       event={clientEvent}
       brandKit={clientBrandKit}
       photos={event.photos}

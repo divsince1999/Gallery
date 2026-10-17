@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
-import { X, ChevronLeft, ChevronRight, Image as ImageIcon, Calendar, User } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Image as ImageIcon, Calendar, User, Download } from "lucide-react";
 
 export type ClientPhoto = {
   id: string;
@@ -27,12 +27,14 @@ export type ClientEvent = {
 };
 
 interface ClientGalleryProps {
+  publicId: string;
   event: ClientEvent;
   brandKit: ClientBrandKit;
   photos: ClientPhoto[];
 }
 
 export default function ClientGallery({
+  publicId,
   event,
   brandKit,
   photos,
@@ -166,6 +168,19 @@ export default function ClientGallery({
                     <ImageIcon className="w-8 h-8" />
                   </div>
                 )}
+                {/* Download Button on Tile Hover */}
+                <a
+                  id={`tile-download-${idx}`}
+                  href={`/api/gallery/${publicId}/photos/${photo.id}/download`}
+                  download
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute bottom-2 right-2 p-1.5 bg-black/75 hover:bg-black text-white/80 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center justify-center shadow-md backdrop-blur-sm"
+                  aria-label={`Download original photo ${photo.fileName}`}
+                  title="Download original photo"
+                >
+                  <Download className="w-4 h-4" />
+                </a>
+
                 {/* Subtle Hover Veil */}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none" />
               </div>
@@ -183,6 +198,20 @@ export default function ClientGallery({
         <DialogBackdrop className="fixed inset-0 bg-black/95 backdrop-blur-sm transition-opacity" />
         <div className="fixed inset-0 flex w-screen items-center justify-center p-2 sm:p-6">
           <DialogPanel className="relative flex max-w-7xl w-full h-full max-h-[92vh] flex-col bg-transparent items-center justify-center">
+            {/* Download Original Button */}
+            {selectedPhoto && (
+              <a
+                id="client-lightbox-download"
+                href={`/api/gallery/${publicId}/photos/${selectedPhoto.id}/download`}
+                download
+                className="absolute top-2 right-12 sm:top-4 sm:right-16 p-2 text-white/70 hover:text-white bg-black/60 hover:bg-black/90 rounded-full transition-colors z-30 flex items-center justify-center"
+                aria-label="Download original photo"
+                title="Download original photo"
+              >
+                <Download className="w-6 h-6" />
+              </a>
+            )}
+
             {/* Close Button */}
             <button
               id="client-lightbox-close"
