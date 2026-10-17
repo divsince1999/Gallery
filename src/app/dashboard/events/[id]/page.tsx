@@ -60,6 +60,9 @@ export default async function EventDetailsPage({
         eventId={event.id}
         initialStatus={event.status as "DRAFT" | "PUBLISHED"}
         publicId={event.publicId}
+        eventName={event.name}
+        clientName={event.clientName}
+        expiryDate={event.expiryDate ? event.expiryDate.toISOString() : null}
       />
 
       <div className="bg-white shadow rounded-lg overflow-hidden">

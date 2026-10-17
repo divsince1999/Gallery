@@ -1,8 +1,21 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useSyncExternalStore } from "react";
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
-import { X, ChevronLeft, ChevronRight, Image as ImageIcon, Calendar, User, Download } from "lucide-react";
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Image as ImageIcon,
+  Calendar,
+  User,
+  Download,
+  Share2,
+  Copy,
+  Check,
+  MessageCircle,
+} from "lucide-react";
+import QRCode from "qrcode";
 
 export type ClientPhoto = {
   id: string;
@@ -33,6 +46,8 @@ interface ClientGalleryProps {
   photos: ClientPhoto[];
 }
 
+const emptySubscribe = () => () => {};
+
 export default function ClientGallery({
   publicId,
   event,
@@ -40,6 +55,51 @@ export default function ClientGallery({
   photos,
 }: ClientGalleryProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<ClientPhoto | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [clientQrDataUrl, setClientQrDataUrl] = useState<string | null>(null);
+  const [copiedShare, setCopiedShare] = useState(false);
+
+  const currentHref = useSyncExternalStore(
+    emptySubscribe,
+    () => window.location.href,
+    () => ""
+  );
+
+  const shareUrl = currentHref || `/gallery/${publicId}`;
+
+  useEffect(() => {
+    if (!shareUrl) return;
+    let active = true;
+    QRCode.toDataURL(shareUrl, {
+      width: 360,
+      margin: 2,
+      color: {
+        dark: "#111827",
+        light: "#ffffff",
+      },
+      errorCorrectionLevel: "M",
+    })
+      .then((qr) => {
+        if (active) setClientQrDataUrl(qr);
+      })
+      .catch((err) => console.error("Error generating client QR:", err));
+
+    return () => {
+      active = false;
+    };
+  }, [shareUrl]);
+
+  const handleCopyShareUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        shareUrl || (typeof window !== "undefined" ? window.location.href : "")
+      );
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 2000);
+    } catch {
+      setCopiedShare(false);
+    }
+  };
 
   const baseUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "";
   const studioName = brandKit?.studioName || "Studio Gallery";
@@ -127,6 +187,16 @@ export default function ClientGallery({
             <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-neutral-900 border border-neutral-800 font-medium text-neutral-300">
               {photos.length} {photos.length === 1 ? "Photo" : "Photos"}
             </span>
+            <button
+              id="client-share-button"
+              type="button"
+              onClick={() => setIsShareModalOpen(true)}
+              className="inline-flex items-center px-3 py-1 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium border border-neutral-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-500"
+              title="Share this gallery"
+            >
+              <Share2 className="w-3.5 h-3.5 mr-1.5 text-neutral-400" />
+              Share
+            </button>
           </div>
         </div>
       </header>
@@ -272,6 +342,86 @@ export default function ClientGallery({
                 className="absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 px-3.5 py-1.5 bg-black/70 backdrop-blur-md text-white/90 text-xs sm:text-sm font-medium rounded-full pointer-events-none border border-white/10"
               >
                 {selectedIndex + 1} / {photos.length}
+              </div>
+            )}
+          </DialogPanel>
+        </div>
+      </Dialog>
+
+      {/* Share Modal for Clients & Visitors */}
+      <Dialog
+        open={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        className="relative z-50"
+      >
+        <DialogBackdrop className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" />
+        <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
+          <DialogPanel className="w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-2xl p-6 text-neutral-100 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-white">Share Gallery</h3>
+              <button
+                id="client-share-modal-close"
+                type="button"
+                onClick={() => setIsShareModalOpen(false)}
+                className="text-neutral-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-neutral-400">
+              Anyone with this link can view photos in &ldquo;{event.name}&rdquo; and download originals.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <button
+                id="client-copy-link-btn"
+                type="button"
+                onClick={handleCopyShareUrl}
+                className="flex-1 inline-flex items-center justify-center px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-xs font-medium border border-neutral-700 transition-colors"
+              >
+                {copiedShare ? (
+                  <>
+                    <Check className="w-4 h-4 mr-1.5 text-green-400" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 mr-1.5 text-neutral-400" />
+                    Copy Link
+                  </>
+                )}
+              </button>
+
+              <a
+                id="client-whatsapp-share-btn"
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `Check out the photo gallery for "${event.name}": ${shareUrl}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 inline-flex items-center justify-center px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors"
+              >
+                <MessageCircle className="w-4 h-4 mr-1.5" />
+                WhatsApp
+              </a>
+            </div>
+
+            {/* QR Code */}
+            {clientQrDataUrl && (
+              <div className="pt-3 border-t border-neutral-800 flex flex-col items-center text-center space-y-2">
+                <div className="p-2.5 bg-white rounded-xl shadow-md">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    id="client-qr-image"
+                    src={clientQrDataUrl}
+                    alt={`QR Code for ${event.name}`}
+                    className="w-32 h-32 object-contain"
+                  />
+                </div>
+                <p className="text-[11px] text-neutral-400">
+                  Scan with a phone camera to open on mobile
+                </p>
               </div>
             )}
           </DialogPanel>

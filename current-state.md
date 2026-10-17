@@ -15,7 +15,8 @@ V1
 - Public Client Gallery (unauthenticated viewer + publish toggle + branding + expiry enforcement) — IMPLEMENTED & VERIFIED
 - Optional Gallery Expiry (creation form input + server validation + database persistence) — IMPLEMENTED & VERIFIED
 - Individual Original Downloads (short-lived presigned GET URLs from private bucket + access control + download UI) — IMPLEMENTED & VERIFIED
-- Overall V1 Status: IN PROGRESS (Sharing options like QR / WhatsApp remain per implementation_plan.md)
+- Gallery Sharing and QR Codes (copy link + WhatsApp share + dynamic QR code generator + download PNG + draft/expiry protection + client share modal) — IMPLEMENTED & VERIFIED
+- Overall V1 Status: CORE V1 COMPLETE (All core photographer and client gallery workflows implemented and verified)
 
 ## Phase 1 Completed
 - Next.js + TypeScript + Tailwind
@@ -103,7 +104,31 @@ V1
 - Returns a `302 Found` redirect with `Cache-Control: no-store, max-age=0`.
 - Client Gallery UI: Download button integrated into both grid tiles (hover) and fullscreen lightbox viewer controls (`#client-lightbox-download`).
 
-## Verification Results (2026-10-17)
+### Gallery Sharing and QR Codes
+- Photographer Event Dashboard: `src/app/dashboard/events/[id]/PublishToggle.tsx`
+  - Copy Link: Prominent action with instant visual confirmation (`Copied!`) and read-only text input (`#public-gallery-url-input`) for desktop and mobile ergonomics.
+  - WhatsApp Share: Prefills personalized client greeting (`https://wa.me/?text=...`) including client name, event name, and the working public gallery link.
+  - Dynamic QR Code: Real-time QR generation (`qrcode` library, high-resolution PNG) encoding the exact public gallery URL.
+  - Download QR Code: Direct PNG download button (`#download-qr-btn`) allowing photographers to save the QR code for print marketing, welcome signage, or reception table cards.
+  - Draft & Expiry Protection: Clear warning banners `#unpublished-warning-banner` and `#expired-warning-banner`. Sharing controls are gated during DRAFT mode to prevent accidental client exposure to 404 links.
+- Client Public Gallery Share Modal: `src/app/gallery/[publicId]/ClientGallery.tsx`
+  - Header Share Button (`#client-share-button`): Opens an elegant sharing dialog.
+  - Allows clients and guests to copy link, share via WhatsApp, or display the QR code for on-screen mobile scanning.
+
+## Verification Results (2026-10-17 — Gallery Sharing and QR Codes)
+- TypeScript: `npx tsc --noEmit` passed with 0 errors.
+- ESLint: `npm run lint` passed with 0 errors / 0 warnings.
+- Production Build: `npm run build` compiled cleanly in 1.8s (Next.js 16.3.5 Turbopack).
+- Automated Sharing & QR Suite (`scratch/verify_sharing_qr.ts`):
+  - Copy Link produces exact working public gallery URL (`http://localhost:3000/gallery/...`).
+  - WhatsApp Share URL contains pre-filled message with exact public gallery URL.
+  - QR Code PNG generated via `qrcode` and decoded via `jsQR` matches public gallery URL with 100% fidelity.
+  - Unauthenticated/incognito request to published gallery returns `200 OK`.
+  - Draft gallery returns `404 Not Found`.
+  - Expired gallery returns `404 Not Found`.
+- Browser E2E Test: Full verification recorded (`verify_sharing_qr_1792230777811.webp`). Verified photographer dashboard sharing controls, copy link feedback, WhatsApp link, QR code render and download, and client gallery share modal.
+
+## Verification Results (2026-10-17 — Individual Downloads)
 - TypeScript: `npx tsc --noEmit` passed with 0 errors.
 - ESLint: `npm run lint` passed with 0 errors / 0 warnings.
 - Production Build: `npm run build` compiled cleanly in 2.3s (Next.js 16.3.5 Turbopack); compiled dynamic route `ƒ /api/gallery/[publicId]/photos/[photoId]/download`.
