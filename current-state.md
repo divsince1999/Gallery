@@ -1,6 +1,6 @@
 # Gallery — Current State
 
-_Last updated: 2026-10-15_
+_Last updated: 2026-10-17_
 
 ## Product
 White-label, ad-free photo gallery platform for Indian photographers.
@@ -13,6 +13,7 @@ V1
 - Phase 2 (Event Management + R2 + upload + processing) — STABILIZED & VERIFIED
 - Photographer Gallery (read-only) — STABILIZED & VERIFIED
 - Public Client Gallery (unauthenticated viewer + publish toggle + branding + expiry enforcement) — IMPLEMENTED & VERIFIED
+- Optional Gallery Expiry (creation form input + server validation + database persistence) — IMPLEMENTED & VERIFIED
 - Overall V1 Status: IN PROGRESS (Individual downloads and sharing options remain per implementation_plan.md)
 
 ## Phase 1 Completed
@@ -32,9 +33,9 @@ V1
 ## Phase 2 Completed
 
 ### Event Management
-- `createEvent` server action: auth, validation, random 32-hex `publicId`, retry on collision.
-- Event details page is ownership-gated (404 for other users' events or non-existent events).
-- Not built: edit, delete, publish, expiry behaviour (`Event.status` is always DRAFT).
+- `createEvent` server action: auth, validation, random 32-hex `publicId`, retry on collision, optional `expiryDate` parsing and validation.
+- Event details page is ownership-gated (404 for other users' events or non-existent events) and displays Event Details including Client Name, Event Date, Gallery Expiry status, and IDs.
+- Event publishing and expiry: photographers can toggle between DRAFT and PUBLISHED; optional gallery expiry date can be set during creation or left blank for no expiration; expired galleries return 404.
 
 ### Cloudflare R2
 - Two buckets:
@@ -86,6 +87,16 @@ V1
   - Fullscreen lightbox viewer with Next/Previous navigation, keyboard controls (`ArrowLeft`, `ArrowRight`, `Escape`), and image counter indicator.
   - Empty state when no ready photos exist.
   - Completely excludes all photographer admin controls, uploaders, and queue statuses.
+
+## Verification Results (2026-10-17)
+- TypeScript: `npx tsc --noEmit` passed with 0 errors.
+- ESLint: `npm run lint` passed with 0 errors / 0 warnings.
+- Production Build: `npm run build` compiled cleanly in 7.1s (Next.js 16.3.5 Turbopack).
+- Automated Expiry Tests:
+  - Event creation with blank expiry -> stored as `null`, published gallery returns `200 OK`.
+  - Event creation with future expiry -> stored as future timestamp (`2026-12-31T00:00:00.000Z`), published gallery returns `200 OK`.
+  - Event creation with past expiry -> stored as past timestamp (`2026-10-10T00:00:00.000Z`), published gallery returns `404 Not Found`.
+  - Server validation: blank/whitespace/null parses to `null`, valid date strings parse to Date, invalid date strings correctly throw `Invalid expiry date`.
 
 ## Verification Results (2026-10-15)
 - TypeScript: `npx tsc --noEmit` passed with 0 errors.

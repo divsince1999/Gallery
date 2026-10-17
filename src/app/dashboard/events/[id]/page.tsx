@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Calendar, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Calendar, User as UserIcon, Clock } from "lucide-react";
 import BulkUploader from "./BulkUploader";
 import ProcessingDriver from "./ProcessingDriver";
 import GalleryGrid from "./GalleryGrid";
@@ -79,6 +79,18 @@ export default async function EventDetailsPage({
                 <Calendar className="h-4 w-4 mr-2" /> Event Date
               </dt>
               <dd className="mt-1 text-sm text-gray-900">{event.date.toLocaleDateString()}</dd>
+            </div>
+            <div className="sm:col-span-1">
+              <dt className="text-sm font-medium text-gray-500 flex items-center">
+                <Clock className="h-4 w-4 mr-2" /> Gallery Expiry
+              </dt>
+              <dd className="mt-1 text-sm text-gray-900">
+                {event.expiryDate
+                  ? `${event.expiryDate.toLocaleDateString()}${
+                      new Date() > new Date(event.expiryDate) ? " (Expired)" : ""
+                    }`
+                  : "No expiration"}
+              </dd>
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500">Internal ID</dt>

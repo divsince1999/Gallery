@@ -61,6 +61,23 @@ export default function NewEventPage() {
             </div>
           </div>
 
+          <div>
+            <label htmlFor="expiryDate" className="block text-sm font-medium text-gray-700">
+              Gallery Expiry Date <span className="text-gray-400 font-normal">(Optional)</span>
+            </label>
+            <div className="mt-1">
+              <input
+                type="date"
+                name="expiryDate"
+                id="expiryDate"
+                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border"
+              />
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Leave blank for no expiration. If set to a past date, the gallery will be expired and inaccessible immediately upon publishing.
+            </p>
+          </div>
+
           <div className="flex justify-end">
             <Link
               href="/dashboard"

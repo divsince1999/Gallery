@@ -23,6 +23,7 @@ export async function createEvent(formData: FormData) {
   const name = formData.get("name") as string;
   const clientName = formData.get("clientName") as string;
   const dateStr = formData.get("date") as string;
+  const expiryDateRaw = formData.get("expiryDate");
 
   if (!name || !clientName || !dateStr) {
     throw new Error("Missing required fields");
@@ -31,6 +32,15 @@ export async function createEvent(formData: FormData) {
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) {
     throw new Error("Invalid date");
+  }
+
+  let expiryDate: Date | null = null;
+  if (expiryDateRaw && typeof expiryDateRaw === "string" && expiryDateRaw.trim() !== "") {
+    const parsedExpiry = new Date(expiryDateRaw.trim());
+    if (isNaN(parsedExpiry.getTime())) {
+      throw new Error("Invalid expiry date");
+    }
+    expiryDate = parsedExpiry;
   }
 
   const photographerId = session.user.id;
@@ -46,6 +56,7 @@ export async function createEvent(formData: FormData) {
           name,
           clientName,
           date,
+          expiryDate,
           photographerId,
         },
       });
