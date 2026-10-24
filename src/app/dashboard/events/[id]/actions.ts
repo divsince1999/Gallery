@@ -114,7 +114,6 @@ export async function generateUploadUrl(
     Bucket: R2_BUCKET_NAME,
     Key: objectKey,
     ContentType: fileMetadata.type,
-    ContentLength: fileMetadata.size,
   });
 
   // URL expires in 15 minutes
