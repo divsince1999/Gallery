@@ -220,6 +220,8 @@ export interface DiagnosticResult {
   stage?: "upload" | "cleanup";
   errorCode?: string;
   httpStatus?: number;
+  accountIdMatches?: boolean;
+  bucketNameMatches?: boolean;
 }
 
 export async function runR2Diagnostic(eventId: string): Promise<DiagnosticResult> {
@@ -243,6 +245,12 @@ export async function runR2Diagnostic(eventId: string): Promise<DiagnosticResult
     throw new Error("Unauthorized");
   }
 
+  const EXPECTED_ACCOUNT_ID = "a8ca2b8ddcd8225f03784d923547ae2f";
+  const EXPECTED_BUCKET_NAME = "gallery-originals-prod";
+
+  const accountIdMatches = process.env.R2_ACCOUNT_ID === EXPECTED_ACCOUNT_ID;
+  const bucketNameMatches = process.env.R2_BUCKET_NAME === EXPECTED_BUCKET_NAME;
+
   const testKey = `_diagnostic_probe_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.txt`;
 
   // 3. Attempt harmless upload using production r2Client and R2_BUCKET_NAME
@@ -263,6 +271,8 @@ export async function runR2Diagnostic(eventId: string): Promise<DiagnosticResult
       stage: "upload",
       errorCode: error.name || error.Code || "UnknownError",
       httpStatus: error.$metadata?.httpStatusCode,
+      accountIdMatches,
+      bucketNameMatches,
     };
   }
 
@@ -282,12 +292,16 @@ export async function runR2Diagnostic(eventId: string): Promise<DiagnosticResult
       stage: "cleanup",
       errorCode: error.name || error.Code || "UnknownError",
       httpStatus: error.$metadata?.httpStatusCode,
+      accountIdMatches,
+      bucketNameMatches,
     };
   }
 
   return {
     success: true,
     bucket: R2_BUCKET_NAME,
+    accountIdMatches,
+    bucketNameMatches,
   };
 }
 

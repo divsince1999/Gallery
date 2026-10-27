@@ -261,6 +261,13 @@ export default function BulkUploader({ eventId }: { eventId: string }) {
               <strong>Diagnostic Failed:</strong> Bucket <code>{diagnosticState.result.bucket}</code> returned error <code>{diagnosticState.result.errorCode}</code> (HTTP Status: {diagnosticState.result.httpStatus ?? "N/A"}).
             </p>
           )}
+
+          {typeof diagnosticState.result.accountIdMatches === "boolean" && (
+            <div className="mt-2 pt-2 border-t border-current/20 text-xs flex flex-wrap gap-4">
+              <span>Account ID matches expected: <strong>{diagnosticState.result.accountIdMatches ? "true" : "false"}</strong></span>
+              <span>Bucket name matches expected: <strong>{diagnosticState.result.bucketNameMatches ? "true" : "false"}</strong></span>
+            </div>
+          )}
         </div>
       )}
       
