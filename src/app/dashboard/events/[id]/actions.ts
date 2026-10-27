@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { r2Client, R2_BUCKET_NAME } from "@/lib/r2";
-import { PutObjectCommand, HeadObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { revalidatePath } from "next/cache";
 
@@ -214,94 +214,4 @@ export async function togglePublishEvent(
   return { success: true, status: updatedEvent.status };
 }
 
-export interface DiagnosticResult {
-  success: boolean;
-  bucket: string;
-  stage?: "upload" | "cleanup";
-  errorCode?: string;
-  httpStatus?: number;
-  accountIdMatches?: boolean;
-  bucketNameMatches?: boolean;
-}
-
-export async function runR2Diagnostic(eventId: string): Promise<DiagnosticResult> {
-  // 1. Authenticate the session
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    throw new Error("Unauthenticated");
-  }
-
-  // 2. Verify event ownership (matches repository authorization pattern)
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    select: { photographerId: true },
-  });
-
-  if (!event) {
-    throw new Error("Event not found");
-  }
-
-  if (event.photographerId !== session.user.id) {
-    throw new Error("Unauthorized");
-  }
-
-  const EXPECTED_ACCOUNT_ID = "a8ca2b8ddcd8225f03784d923547ae2f";
-  const EXPECTED_BUCKET_NAME = "gallery-originals-prod";
-
-  const accountIdMatches = process.env.R2_ACCOUNT_ID === EXPECTED_ACCOUNT_ID;
-  const bucketNameMatches = process.env.R2_BUCKET_NAME === EXPECTED_BUCKET_NAME;
-
-  const testKey = `_diagnostic_probe_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.txt`;
-
-  // 3. Attempt harmless upload using production r2Client and R2_BUCKET_NAME
-  try {
-    await r2Client.send(
-      new PutObjectCommand({
-        Bucket: R2_BUCKET_NAME,
-        Key: testKey,
-        Body: "diagnostic-probe",
-        ContentType: "text/plain",
-      })
-    );
-  } catch (err: unknown) {
-    const error = err as { name?: string; Code?: string; $metadata?: { httpStatusCode?: number } };
-    return {
-      success: false,
-      bucket: R2_BUCKET_NAME,
-      stage: "upload",
-      errorCode: error.name || error.Code || "UnknownError",
-      httpStatus: error.$metadata?.httpStatusCode,
-      accountIdMatches,
-      bucketNameMatches,
-    };
-  }
-
-  // 4. Clean up probe object immediately if upload succeeded
-  try {
-    await r2Client.send(
-      new DeleteObjectCommand({
-        Bucket: R2_BUCKET_NAME,
-        Key: testKey,
-      })
-    );
-  } catch (err: unknown) {
-    const error = err as { name?: string; Code?: string; $metadata?: { httpStatusCode?: number } };
-    return {
-      success: false,
-      bucket: R2_BUCKET_NAME,
-      stage: "cleanup",
-      errorCode: error.name || error.Code || "UnknownError",
-      httpStatus: error.$metadata?.httpStatusCode,
-      accountIdMatches,
-      bucketNameMatches,
-    };
-  }
-
-  return {
-    success: true,
-    bucket: R2_BUCKET_NAME,
-    accountIdMatches,
-    bucketNameMatches,
-  };
-}
 

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { generateUploadUrl, verifyUpload, runR2Diagnostic, type DiagnosticResult } from "./actions";
+import { generateUploadUrl, verifyUpload } from "./actions";
 import { UploadCloud, XCircle, CheckCircle, AlertCircle, RefreshCw, Loader2, Image as ImageIcon } from "lucide-react";
 
 type UploadState = "QUEUED" | "UPLOADING" | "VERIFYING" | "UPLOADED" | "FAILED" | "DUPLICATE/SKIPPED";
@@ -26,7 +26,6 @@ export default function BulkUploader({ eventId }: { eventId: string }) {
 
   // React state purely for rendering
   const [files, setFiles] = useState<QueuedFile[]>([]);
-  const [diagnosticState, setDiagnosticState] = useState<{ running: boolean; result?: DiagnosticResult } | null>(null);
   const queueProcessorRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const processQueueRef = useRef<(() => void) | null>(null);
   const isUploadingRef = useRef(false);
@@ -207,69 +206,7 @@ export default function BulkUploader({ eventId }: { eventId: string }) {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow border border-gray-200 mt-8">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold text-gray-900">Upload Photos (Bulk)</h2>
-        <button
-          type="button"
-          onClick={async () => {
-            setDiagnosticState({ running: true });
-            try {
-              const res = await runR2Diagnostic(eventId);
-              setDiagnosticState({ running: false, result: res });
-            } catch {
-              setDiagnosticState({
-                running: false,
-                result: {
-                  success: false,
-                  bucket: "unknown",
-                  errorCode: "DiagnosticInvocationFailed",
-                },
-              });
-            }
-          }}
-          disabled={diagnosticState?.running}
-          className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded border border-gray-300 font-medium transition-colors"
-        >
-          {diagnosticState?.running ? "Running Diagnostic..." : "Run Storage Diagnostic"}
-        </button>
-      </div>
-
-      {diagnosticState?.result && (
-        <div
-          className={`mb-4 p-3 rounded text-sm ${
-            diagnosticState.result.success
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : diagnosticState.result.stage === "cleanup"
-              ? "bg-amber-50 text-amber-800 border border-amber-200"
-              : "bg-red-50 text-red-800 border border-red-200"
-          }`}
-        >
-          {diagnosticState.result.success ? (
-            <p>
-              <strong>Diagnostic Passed:</strong> Target bucket <code>{diagnosticState.result.bucket}</code> is authorized for uploads and deletes.
-            </p>
-          ) : diagnosticState.result.errorCode === "DiagnosticInvocationFailed" ? (
-            <p>
-              <strong>Diagnostic Failed:</strong> An unexpected error occurred while executing the diagnostic.
-            </p>
-          ) : diagnosticState.result.stage === "cleanup" ? (
-            <p>
-              <strong>Diagnostic Incomplete (Cleanup Failed):</strong> Upload probe succeeded, but deletion failed on bucket <code>{diagnosticState.result.bucket}</code> with error <code>{diagnosticState.result.errorCode}</code> (HTTP Status: {diagnosticState.result.httpStatus ?? "N/A"}). The test probe may remain in the bucket.
-            </p>
-          ) : (
-            <p>
-              <strong>Diagnostic Failed:</strong> Bucket <code>{diagnosticState.result.bucket}</code> returned error <code>{diagnosticState.result.errorCode}</code> (HTTP Status: {diagnosticState.result.httpStatus ?? "N/A"}).
-            </p>
-          )}
-
-          {typeof diagnosticState.result.accountIdMatches === "boolean" && (
-            <div className="mt-2 pt-2 border-t border-current/20 text-xs flex flex-wrap gap-4">
-              <span>Account ID matches expected: <strong>{diagnosticState.result.accountIdMatches ? "true" : "false"}</strong></span>
-              <span>Bucket name matches expected: <strong>{diagnosticState.result.bucketNameMatches ? "true" : "false"}</strong></span>
-            </div>
-          )}
-        </div>
-      )}
+      <h2 className="text-xl font-semibold mb-4 text-gray-900">Upload Photos (Bulk)</h2>
       
       <div 
         {...getRootProps()} 
